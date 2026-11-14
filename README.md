@@ -5,10 +5,10 @@ Proyecto final de Bases de Datos (Ejercicio 4). Python + Django + **SQL Server**
 ```
 taller/
 ├── sql/
-│   ├── 01_tablas.sql             15 tablas con PK, FK, UNIQUE, CHECK e índices
+│   ├── 01_tablas.sql             20 tablas normalizadas (1FN–3FN) con PK, FK, UNIQUE, CHECK e índices
 │   ├── 02_datos.sql              catálogos y datos de prueba
-│   ├── 03_funciones_vistas.sql   fn_TotalOrden, fn_PagadoOrden y 4 vistas
-│   ├── 04_procedimientos.sql     9 procedimientos (+ órdenes de ejemplo)
+│   ├── 03_funciones_vistas.sql   fn_TotalOrden, fn_PagadoOrden y 6 vistas
+│   ├── 04_procedimientos.sql     12 procedimientos (+ órdenes de ejemplo)
 │   └── 05_reportes.sql           consultas de los reportes para probar en SSMS
 ├── web/                          proyecto Django
 │   ├── .env.example              plantilla de la conexión (copiar como .env)
@@ -50,9 +50,10 @@ USE TallerDB;
 SELECT type_desc, COUNT(*) AS Cantidad FROM sys.objects
 WHERE type IN ('V','P','FN') GROUP BY type_desc;
 ```
-Debe mostrar **VIEW 4**, **SQL_STORED_PROCEDURE 9** y **SQL_SCALAR_FUNCTION 2**.
+Debe mostrar **VIEW 6**, **SQL_STORED_PROCEDURE 12** y **SQL_SCALAR_FUNCTION 2**.
 
-> ⚠️ No ejecuten `02_datos.sql` dos veces: da errores de datos duplicados.
+> ⚠️ `01_tablas.sql` **borra y vuelve a crear** TallerDB. Para empezar de cero, ejecuten de nuevo los 4 scripts en orden.
+> No ejecuten `02_datos.sql` solo una segunda vez: da errores de datos duplicados.
 
 ### Paso 3. Crear el entorno virtual e instalar dependencias
 ```powershell
@@ -109,6 +110,7 @@ python manage.py runserver
 | `Login failed` y en SSMS entran **sin contraseña** | Usan autenticación de Windows | En `.env` dejar `DB_USER=` vacío. |
 | `Data source name not found` / `Can't open lib 'ODBC Driver 18 for SQL Server'` | Falta el driver ODBC | Instalar **ODBC Driver 18 for SQL Server** (link en requisitos). |
 | `A network-related or instance-specific error` / `Named Pipes Provider` | El servidor o la instancia no es el correcto, o SQL Server está apagado | Usar el mismo nombre de servidor que aparece en SSMS. Si es Express: `DB_HOST=localhost\SQLEXPRESS`. Verificar en *Servicios de Windows* que **SQL Server** esté iniciado. |
+| `Invalid column name 'Marca'` / `'Telefono'` / `'Direccion'` u otra columna | La base es de la versión anterior (sin atributos atómicos) | Ejecutar de nuevo los 4 scripts en orden; `01_tablas.sql` recrea la base. |
 | `Cannot open database "TallerDB"` | No se ejecutaron los scripts SQL | Hacer el Paso 2. |
 | `Could not find stored procedure 'sp_...'` o `Invalid object name 'vw_...'` | Faltan los scripts 03 o 04 | Ejecutar `03_funciones_vistas.sql` y `04_procedimientos.sql`. |
 | `Error: That port is already in use` | Ya hay otro `runserver` abierto | Cerrar la otra terminal o usar `python manage.py runserver 8001`. |
@@ -119,11 +121,11 @@ python manage.py runserver
 | Requisito | Dónde está |
 |---|---|
 | SQL Server | `settings.py` (motor `mssql`) |
-| ≥ 8 tablas con PK y FK | 15 tablas en `01_tablas.sql` |
+| ≥ 8 tablas con PK y FK | 20 tablas en `01_tablas.sql`, atributos atómicos |
 | Diagrama ER y modelo relacional | `docs/documentacion_tecnica.md` |
-| CRUD con validaciones | Clientes, vehículos, mecánicos, servicios, repuestos (HTML + Python + CHECK/UNIQUE en SQL) |
-| ≥ 5 procedimientos | 9 en `04_procedimientos.sql`, todos llamados desde `views.py` |
-| ≥ 3 vistas | `vw_CostoOrden`, `vw_OrdenesDetalle`, `vw_HistorialServiciosVehiculo`, `vw_CargaMecanicos` |
+| CRUD con validaciones | Clientes, teléfonos, vehículos, mecánicos, servicios, repuestos, marcas, modelos y colores (HTML + Python + CHECK/UNIQUE en SQL) |
+| ≥ 5 procedimientos | 12 en `04_procedimientos.sql`, todos llamados desde `views.py` |
+| ≥ 3 vistas | `vw_CostoOrden`, `vw_Cliente`, `vw_Vehiculo`, `vw_OrdenesDetalle`, `vw_HistorialServiciosVehiculo`, `vw_CargaMecanicos` |
 | JOIN, filtros, orden, agregación | `views.reportes`, `views.inicio`, `05_reportes.sql` |
 | Transacción con reversión | `sp_CambiarEstadoOrden`, `sp_AgregarRepuestoOrden`, `sp_RegistrarClienteVehiculo`, `sp_CrearOrden`, `sp_RegistrarPago` |
 | ≥ 4 reportes | 6 en la pantalla Reportes |

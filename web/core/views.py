@@ -2,7 +2,9 @@
 Vistas del sistema. Cada vista llama a SQL Server mediante core/db.py
 usando consultas con INNER JOIN, vistas (vw_*) y procedimientos (sp_*).
 """
+import re
 from datetime import date
+from itertools import groupby
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -29,6 +31,54 @@ def _numero(request, campo, tipo=int, minimo=0):
     if valor < minimo:
         raise ErrorNegocio(f"El campo «{campo}» no puede ser menor que {minimo}.")
     return valor
+
+
+def _opcional(request, campo):
+    """Número entero opcional (select o campo vacío -> None)."""
+    valor = request.POST.get(campo, "").strip()
+    if not valor:
+        return None
+    if not valor.isdigit():
+        raise ErrorNegocio(f"El campo «{campo}» debe ser numérico.")
+    return int(valor)
+
+
+def _telefono(request, campo="telefono", requerido=True):
+    """Guarda solo dígitos (atomicidad): '5511-2233' -> '55112233'."""
+    numero = re.sub(r"\D", "", request.POST.get(campo, ""))
+    if requerido and not 8 <= len(numero) <= 15:
+        raise ErrorNegocio("El teléfono debe tener entre 8 y 15 dígitos.")
+    return numero
+
+
+def _catalogos_cliente():
+    """Opciones de los selects: municipios agrupados por departamento,
+    modelos agrupados por marca y colores."""
+    municipios = consultar("""SELECT m.IdMunicipio, m.Nombre, d.Nombre AS Departamento
+                              FROM Municipio m INNER JOIN Departamento d ON d.IdDepartamento = m.IdDepartamento
+                              ORDER BY d.IdDepartamento, m.Nombre""")
+    modelos = consultar("""SELECT mo.IdModelo, mo.Nombre, ma.Nombre AS Marca
+                           FROM Modelo mo INNER JOIN Marca ma ON ma.IdMarca = mo.IdMarca
+                           ORDER BY ma.Nombre, mo.Nombre""")
+    return {
+        "municipios": [(k, list(g)) for k, g in groupby(municipios, key=lambda r: r["Departamento"])],
+        "modelos": [(k, list(g)) for k, g in groupby(modelos, key=lambda r: r["Marca"])],
+        "colores": consultar("SELECT * FROM Color ORDER BY Nombre"),
+        "tipos_tel": ["Móvil", "Casa", "Trabajo"],
+    }
+
+
+def _datos_cliente(request):
+    return [_texto(request, "nombres", True, 60), _texto(request, "apellidos", largo=60) or None,
+            _texto(request, "nit", largo=15) or "CF", _texto(request, "correo", largo=100) or None,
+            _texto(request, "calle", largo=100) or None, _opcional(request, "zona"),
+            _opcional(request, "municipio")]
+
+
+def _datos_vehiculo(request):
+    return [_texto(request, "placa", True, 10).upper().replace("-", "").replace(" ", ""),
+            _numero(request, "modelo", int, 1), _numero(request, "anio", int, 1950),
+            _opcional(request, "color"), _numero(request, "kilometraje")]
 
 
 def _eliminar(sql, idx, nombre):
@@ -64,12 +114,13 @@ def inicio(request):
 def clientes(request):
     buscar = request.GET.get("q", "").strip()
     filas = consultar("""
-        SELECT c.IdCliente, c.Nombre, c.NIT, c.Telefono, c.Correo,
+        SELECT c.IdCliente, c.Nombre, c.NIT, c.Telefono, c.Correo, c.Municipio,
                COUNT(v.IdVehiculo) AS Vehiculos
-        FROM Cliente c LEFT JOIN Vehiculo v ON v.IdCliente = c.IdCliente
-        WHERE c.Nombre LIKE %s OR c.NIT LIKE %s OR c.Telefono LIKE %s
-        GROUP BY c.IdCliente, c.Nombre, c.NIT, c.Telefono, c.Correo
-        ORDER BY c.Nombre""", [f"%{buscar}%"] * 3)
+        FROM vw_Cliente c LEFT JOIN Vehiculo v ON v.IdCliente = c.IdCliente
+        WHERE c.Nombre LIKE %s OR c.NIT LIKE %s
+           OR EXISTS (SELECT 1 FROM TelefonoCliente t WHERE t.IdCliente = c.IdCliente AND t.Numero LIKE %s)
+        GROUP BY c.IdCliente, c.Nombre, c.Apellidos, c.Nombres, c.NIT, c.Telefono, c.Correo, c.Municipio
+        ORDER BY c.Apellidos, c.Nombres""", [f"%{buscar}%"] * 3)
     return render(request, "core/clientes.html", {"clientes": filas, "q": buscar})
 
 
@@ -80,39 +131,59 @@ def cliente_nuevo(request):
         try:
             procedimiento(
                 "sp_RegistrarClienteVehiculo",
-                _texto(request, "nombre", True, 100), _texto(request, "nit", largo=15),
-                _texto(request, "telefono", True, 15), _texto(request, "correo", largo=100) or None,
-                _texto(request, "direccion", largo=200) or None,
-                _texto(request, "placa", True, 10).upper(), _texto(request, "marca", True, 50),
-                _texto(request, "modelo", True, 50), _numero(request, "anio", int, 1950),
-                _texto(request, "color", largo=30) or None, _numero(request, "kilometraje"),
+                *_datos_cliente(request),
+                _telefono(request), _texto(request, "tipo_tel") or "Móvil",
+                *_datos_vehiculo(request),
             )
             messages.success(request, "Cliente y vehículo registrados.")
             return redirect("clientes")
         except ErrorNegocio as e:
             messages.error(request, str(e))
-    return render(request, "core/cliente_nuevo.html", {"datos": request.POST})
+    return render(request, "core/cliente_nuevo.html", _catalogos_cliente())
 
 
 @login_required
 def cliente_editar(request, idc):
-    cliente = uno("SELECT * FROM Cliente WHERE IdCliente = %s", [idc])
+    cliente = uno("SELECT * FROM vw_Cliente WHERE IdCliente = %s", [idc])
     if not cliente:
         messages.error(request, "Cliente no encontrado.")
         return redirect("clientes")
     if request.method == "POST":
         try:
-            ejecutar("""UPDATE Cliente SET Nombre=%s, NIT=%s, Telefono=%s, Correo=%s, Direccion=%s
-                        WHERE IdCliente=%s""",
-                     [_texto(request, "nombre", True, 100), _texto(request, "nit", largo=15) or "CF",
-                      _texto(request, "telefono", True, 15), _texto(request, "correo", largo=100) or None,
-                      _texto(request, "direccion", largo=200) or None, idc])
+            ejecutar("""UPDATE Cliente SET Nombres=%s, Apellidos=%s, NIT=%s, Correo=%s,
+                               Calle=%s, Zona=%s, IdMunicipio=%s
+                        WHERE IdCliente=%s""", _datos_cliente(request) + [idc])
             messages.success(request, "Cliente actualizado.")
             return redirect("cliente_editar", idc=idc)
         except ErrorNegocio as e:
             messages.error(request, str(e))
-    vehiculos = consultar("SELECT * FROM Vehiculo WHERE IdCliente = %s ORDER BY Placa", [idc])
-    return render(request, "core/cliente_editar.html", {"c": cliente, "vehiculos": vehiculos})
+    return render(request, "core/cliente_editar.html", {
+        "c": cliente,
+        "vehiculos": consultar("SELECT * FROM vw_Vehiculo WHERE IdCliente = %s ORDER BY Placa", [idc]),
+        "telefonos": consultar("""SELECT * FROM TelefonoCliente WHERE IdCliente = %s
+                                  ORDER BY Principal DESC, IdTelefono""", [idc]),
+        **_catalogos_cliente(),
+    })
+
+
+@login_required
+def telefono_accion(request, idc, accion, idt=None):
+    """Agregar, marcar como principal o eliminar un teléfono (cada uno con su procedimiento)."""
+    if request.method == "POST":
+        try:
+            if accion == "agregar":
+                tipo = request.POST.get("tipo_tel", "Móvil")
+                procedimiento("sp_AgregarTelefonoCliente", idc, _telefono(request), tipo)
+                messages.success(request, "Teléfono agregado.")
+            elif accion == "principal":
+                procedimiento("sp_MarcarTelefonoPrincipal", idt)
+                messages.success(request, "Teléfono principal actualizado.")
+            elif accion == "eliminar":
+                procedimiento("sp_EliminarTelefonoCliente", idt)
+                messages.success(request, "Teléfono eliminado.")
+        except ErrorNegocio as e:
+            messages.error(request, str(e))
+    return redirect("cliente_editar", idc=idc)
 
 
 @login_required
@@ -131,15 +202,13 @@ def vehiculo_guardar(request, idc, idv=None):
     """Agregar (idv=None) o editar un vehículo de un cliente."""
     if request.method == "POST":
         try:
-            datos = [_texto(request, "placa", True, 10).upper(), _texto(request, "marca", True, 50),
-                     _texto(request, "modelo", True, 50), _numero(request, "anio", int, 1950),
-                     _texto(request, "color", largo=30) or None, _numero(request, "kilometraje")]
+            datos = _datos_vehiculo(request)
             if idv:
-                ejecutar("""UPDATE Vehiculo SET Placa=%s, Marca=%s, Modelo=%s, Anio=%s, Color=%s,
+                ejecutar("""UPDATE Vehiculo SET Placa=%s, IdModelo=%s, Anio=%s, IdColor=%s,
                             Kilometraje=%s WHERE IdVehiculo=%s AND IdCliente=%s""", datos + [idv, idc])
             else:
-                ejecutar("""INSERT INTO Vehiculo (Placa, Marca, Modelo, Anio, Color, Kilometraje, IdCliente)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s)""", datos + [idc])
+                ejecutar("""INSERT INTO Vehiculo (Placa, IdModelo, Anio, IdColor, Kilometraje, IdCliente)
+                            VALUES (%s,%s,%s,%s,%s,%s)""", datos + [idc])
             messages.success(request, "Vehículo guardado.")
         except ErrorNegocio as e:
             msg = str(e)
@@ -162,8 +231,7 @@ def historial_vehiculo(request):
     placa = request.GET.get("placa", "").strip().upper()
     vehiculo, filas, ordenes = None, [], []
     if placa:
-        vehiculo = uno("""SELECT v.*, c.Nombre AS Cliente FROM Vehiculo v
-                          INNER JOIN Cliente c ON c.IdCliente = v.IdCliente WHERE v.Placa = %s""", [placa])
+        vehiculo = uno("SELECT * FROM vw_Vehiculo WHERE Placa = %s", [placa])
         filas = procedimiento("sp_HistorialVehiculo", placa)
         ordenes = consultar("SELECT * FROM vw_OrdenesDetalle WHERE Placa=%s ORDER BY FechaIngreso DESC", [placa])
     return render(request, "core/historial.html",
@@ -201,9 +269,8 @@ def orden_nueva(request):
             return redirect("orden_detalle", ido=fila[0]["IdOrden"])
         except ErrorNegocio as e:
             messages.error(request, str(e))
-    vehiculos = consultar("""SELECT v.IdVehiculo, v.Placa, v.Marca, v.Modelo, v.Kilometraje, c.Nombre AS Cliente
-                             FROM Vehiculo v INNER JOIN Cliente c ON c.IdCliente = v.IdCliente
-                             ORDER BY v.Placa""")
+    vehiculos = consultar("""SELECT IdVehiculo, Placa, Marca, Modelo, Kilometraje, Cliente
+                             FROM vw_Vehiculo ORDER BY Placa""")
     return render(request, "core/orden_nueva.html",
                   {"vehiculos": vehiculos, "sel": request.GET.get("vehiculo", "")})
 
@@ -251,7 +318,7 @@ def orden_detalle(request, ido, plantilla="core/orden_detalle.html"):
             LEFT JOIN EstadoOrden ea  ON ea.IdEstado = h.EstadoAnterior
             WHERE h.IdOrden = %s ORDER BY h.FechaCambio""", [ido]),
         "cat_servicios": consultar("SELECT * FROM Servicio WHERE Activo = 1 ORDER BY Nombre"),
-        "cat_mecanicos": consultar("SELECT * FROM Mecanico WHERE Activo = 1 ORDER BY Nombre"),
+        "cat_mecanicos": consultar("SELECT * FROM Mecanico WHERE Activo = 1 ORDER BY Apellidos, Nombres"),
         "cat_repuestos": consultar("SELECT * FROM Repuesto WHERE Stock > 0 ORDER BY Nombre"),
         "metodos": consultar("SELECT * FROM MetodoPago ORDER BY IdMetodoPago"),
     })
@@ -298,8 +365,10 @@ def orden_imprimir(request, ido):
 CATALOGOS = {
     "mecanicos": {
         "titulo": "Mecánicos", "tabla": "Mecanico", "pk": "IdMecanico",
-        "campos": [("Nombre", "Nombre", "text", True), ("Telefono", "Teléfono", "text", False),
+        "campos": [("Nombres", "Nombres", "text", True), ("Apellidos", "Apellidos", "text", True),
+                   ("Telefono", "Teléfono (solo dígitos)", "tel", False),
                    ("TarifaHora", "Tarifa por hora (Q)", "number", True), ("Activo", "Activo", "bool", False)],
+        "orden": "Apellidos, Nombres",
     },
     "servicios": {
         "titulo": "Servicios", "tabla": "Servicio", "pk": "IdServicio",
@@ -311,6 +380,20 @@ CATALOGOS = {
         "campos": [("Codigo", "Código", "text", True), ("Nombre", "Nombre", "text", True),
                    ("Precio", "Precio (Q)", "number", True), ("Stock", "Stock", "number", True),
                    ("StockMinimo", "Stock mínimo", "number", True)],
+    },
+    "marcas": {
+        "titulo": "Marcas", "tabla": "Marca", "pk": "IdMarca",
+        "campos": [("Nombre", "Nombre", "text", True)],
+    },
+    "modelos": {
+        "titulo": "Modelos", "tabla": "Modelo", "pk": "IdModelo",
+        "campos": [("IdMarca", "Marca", "select", True), ("Nombre", "Modelo", "text", True)],
+        "opciones": {"IdMarca": "SELECT IdMarca AS id, Nombre AS txt FROM Marca ORDER BY Nombre"},
+        "orden": "IdMarca, Nombre",
+    },
+    "colores": {
+        "titulo": "Colores", "tabla": "Color", "pk": "IdColor",
+        "campos": [("Nombre", "Nombre", "text", True)],
     },
 }
 
@@ -333,6 +416,10 @@ def catalogo(request, nombre, idx=None):
             for col, etiqueta, tipo, req in campos:
                 if tipo == "bool":
                     valores.append(1 if request.POST.get(col) else 0)
+                elif tipo == "select":
+                    valores.append(_numero(request, col, int, 1))
+                elif tipo == "tel":
+                    valores.append(_telefono(request, col, requerido=False) or None)
                 elif tipo == "number":
                     valores.append(_numero(request, col, float))
                 else:
@@ -348,11 +435,16 @@ def catalogo(request, nombre, idx=None):
             msg = str(e)
             messages.error(request, "Ya existe un registro con ese nombre o código." if "UNIQUE" in msg.upper() else msg)
 
-    registros = consultar(f"SELECT * FROM {tabla} ORDER BY 2")
+    registros = consultar(f"SELECT * FROM {tabla} ORDER BY {cfg.get('orden', '2')}")
     editar = uno(f"SELECT * FROM {tabla} WHERE {pk}=%s", [idx]) if idx else None
-    filas = [{"id": r[pk], "valores": [r[c[0]] for c in campos], "bajo": nombre == "repuestos" and r["Stock"] <= r["StockMinimo"]}
+    # Para las columnas FK (tipo select) se carga la lista de opciones y se muestra el texto, no el id
+    opciones = {col: consultar(sql) for col, sql in cfg.get("opciones", {}).items()}
+    textos = {col: {o["id"]: o["txt"] for o in ops} for col, ops in opciones.items()}
+    filas = [{"id": r[pk],
+              "valores": [textos[c[0]].get(r[c[0]]) if c[0] in textos else r[c[0]] for c in campos],
+              "bajo": nombre == "repuestos" and r["Stock"] <= r["StockMinimo"]}
              for r in registros]
-    form = [{"col": c[0], "etiqueta": c[1], "tipo": c[2], "req": c[3],
+    form = [{"col": c[0], "etiqueta": c[1], "tipo": c[2], "req": c[3], "opciones": opciones.get(c[0], []),
              "valor": (editar or {}).get(c[0], 1 if c[2] == "bool" else "")} for c in campos]
     return render(request, "core/catalogo.html",
                   {"cfg": cfg, "nombre": nombre, "filas": filas, "form": form, "editar": editar})
@@ -382,7 +474,7 @@ def reportes(request):
             INNER JOIN OrdenServicio os ON os.IdMecanico = m.IdMecanico
             INNER JOIN OrdenTrabajo o ON o.IdOrden = os.IdOrden
             WHERE o.IdEstado <> 6 AND CAST(o.FechaIngreso AS DATE) BETWEEN %s AND %s
-            GROUP BY m.Nombre ORDER BY ManoObra DESC""", [desde, hasta]),
+            GROUP BY m.IdMecanico, m.Nombre ORDER BY ManoObra DESC""", [desde, hasta]),
         "tiempos": uno("""
             SELECT AVG(DATEDIFF(MINUTE, h1.FechaCambio, h4.FechaCambio) / 60.0) AS Prom,
                    MAX(DATEDIFF(MINUTE, h1.FechaCambio, h4.FechaCambio) / 60.0) AS Maximo,

@@ -2,30 +2,100 @@
 USE TallerDB;
 GO
 
-/* 1. Registrar cliente y su vehículo en una sola operación (afecta 2 tablas) */
+/* 1. Registrar cliente + teléfono principal + vehículo en UNA transacción (afecta 3 tablas) */
 CREATE OR ALTER PROCEDURE sp_RegistrarClienteVehiculo
-    @Nombre NVARCHAR(100), @NIT NVARCHAR(15), @Telefono NVARCHAR(15),
-    @Correo NVARCHAR(100), @Direccion NVARCHAR(200),
-    @Placa NVARCHAR(10), @Marca NVARCHAR(50), @Modelo NVARCHAR(50),
-    @Anio SMALLINT, @Color NVARCHAR(30), @Kilometraje INT
+    @Nombres NVARCHAR(60), @Apellidos NVARCHAR(60), @NIT NVARCHAR(15), @Correo NVARCHAR(100),
+    @Calle NVARCHAR(100), @Zona TINYINT, @IdMunicipio INT,
+    @Telefono NVARCHAR(15), @TipoTelefono NVARCHAR(10),
+    @Placa NVARCHAR(10), @IdModelo INT, @Anio SMALLINT, @IdColor INT, @Kilometraje INT
 AS
 BEGIN
     SET NOCOUNT ON;
     BEGIN TRY
         IF EXISTS (SELECT 1 FROM Vehiculo WHERE Placa = @Placa)
             THROW 50001, 'Ya existe un vehículo con esa placa.', 1;
+        IF NOT EXISTS (SELECT 1 FROM Modelo WHERE IdModelo = @IdModelo)
+            THROW 50005, 'Seleccione un modelo válido.', 1;
 
         BEGIN TRAN;
-            INSERT INTO Cliente (Nombre, NIT, Telefono, Correo, Direccion)
-            VALUES (@Nombre, ISNULL(NULLIF(@NIT,''),'CF'), @Telefono, @Correo, @Direccion);
+            INSERT INTO Cliente (Nombres, Apellidos, NIT, Correo, Calle, Zona, IdMunicipio)
+            VALUES (@Nombres, NULLIF(@Apellidos,''), ISNULL(NULLIF(@NIT,''),'CF'), NULLIF(@Correo,''),
+                    NULLIF(@Calle,''), @Zona, @IdMunicipio);
 
             DECLARE @IdCliente INT = SCOPE_IDENTITY();
 
-            INSERT INTO Vehiculo (IdCliente, Placa, Marca, Modelo, Anio, Color, Kilometraje)
-            VALUES (@IdCliente, UPPER(@Placa), @Marca, @Modelo, @Anio, @Color, @Kilometraje);
+            INSERT INTO TelefonoCliente (IdCliente, Numero, Tipo, Principal)
+            VALUES (@IdCliente, @Telefono, ISNULL(@TipoTelefono, N'Móvil'), 1);
+
+            INSERT INTO Vehiculo (IdCliente, Placa, IdModelo, Anio, IdColor, Kilometraje)
+            VALUES (@IdCliente, UPPER(@Placa), @IdModelo, @Anio, @IdColor, @Kilometraje);
         COMMIT;
 
         SELECT @IdCliente AS IdCliente;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        THROW;
+    END CATCH
+END;
+GO
+
+/* 1b. Agregar teléfono a un cliente (si es el primero queda como principal) */
+CREATE OR ALTER PROCEDURE sp_AgregarTelefonoCliente
+    @IdCliente INT, @Numero NVARCHAR(15), @Tipo NVARCHAR(10)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF EXISTS (SELECT 1 FROM TelefonoCliente WHERE IdCliente = @IdCliente AND Numero = @Numero)
+        THROW 50060, 'Ese teléfono ya está registrado para el cliente.', 1;
+
+    INSERT INTO TelefonoCliente (IdCliente, Numero, Tipo, Principal)
+    VALUES (@IdCliente, @Numero, @Tipo,
+            CASE WHEN EXISTS (SELECT 1 FROM TelefonoCliente WHERE IdCliente = @IdCliente) THEN 0 ELSE 1 END);
+END;
+GO
+
+/* 1c. Marcar un teléfono como principal (transacción: quita el anterior y pone el nuevo) */
+CREATE OR ALTER PROCEDURE sp_MarcarTelefonoPrincipal @IdTelefono INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        BEGIN TRAN;
+            DECLARE @IdCliente INT = (SELECT IdCliente FROM TelefonoCliente WITH (UPDLOCK) WHERE IdTelefono = @IdTelefono);
+            IF @IdCliente IS NULL THROW 50061, 'Teléfono no encontrado.', 1;
+
+            UPDATE TelefonoCliente SET Principal = 0 WHERE IdCliente = @IdCliente AND Principal = 1;
+            UPDATE TelefonoCliente SET Principal = 1 WHERE IdTelefono = @IdTelefono;
+        COMMIT;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK;
+        THROW;
+    END CATCH
+END;
+GO
+
+/* 1d. Eliminar teléfono: no deja al cliente sin teléfonos; si era el principal, promueve otro */
+CREATE OR ALTER PROCEDURE sp_EliminarTelefonoCliente @IdTelefono INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        BEGIN TRAN;
+            DECLARE @IdCliente INT, @EraPrincipal BIT;
+            SELECT @IdCliente = IdCliente, @EraPrincipal = Principal
+            FROM TelefonoCliente WITH (UPDLOCK) WHERE IdTelefono = @IdTelefono;
+
+            IF @IdCliente IS NULL THROW 50061, 'Teléfono no encontrado.', 1;
+            IF (SELECT COUNT(*) FROM TelefonoCliente WHERE IdCliente = @IdCliente) = 1
+                THROW 50062, 'El cliente debe conservar al menos un teléfono.', 1;
+
+            DELETE FROM TelefonoCliente WHERE IdTelefono = @IdTelefono;
+
+            IF @EraPrincipal = 1
+                UPDATE TOP (1) TelefonoCliente SET Principal = 1 WHERE IdCliente = @IdCliente;
+        COMMIT;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;

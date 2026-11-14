@@ -14,6 +14,11 @@
     <form method="post" class="f">{% csrf_token %}
       {% for f in form %}<div>
         {% if f.tipo == "bool" %}<label><input type="checkbox" name="{{ f.col }}" {% if f.valor %}checked{% endif %}> {{ f.etiqueta }}</label>
+        {% elif f.tipo == "select" %}<label>{{ f.etiqueta }}{% if f.req %} *{% endif %}</label>
+          <select name="{{ f.col }}" {% if f.req %}required{% endif %}><option value="">-- Seleccione --</option>
+            {% for o in f.opciones %}<option value="{{ o.id }}" {% if f.valor == o.id %}selected{% endif %}>{{ o.txt }}</option>{% endfor %}</select>
+        {% elif f.tipo == "tel" %}<label>{{ f.etiqueta }}{% if f.req %} *{% endif %}</label>
+          <input name="{{ f.col }}" maxlength="20" inputmode="numeric" pattern="[0-9 \-]{8,20}" value="{{ f.valor|default_if_none:'' }}" {% if f.req %}required{% endif %}>
         {% else %}<label>{{ f.etiqueta }}{% if f.req %} *{% endif %}</label>
           <input name="{{ f.col }}" {% if f.tipo == "number" %}type="number" step="0.01" min="0"{% endif %} value="{{ f.valor|default_if_none:''|stringformat:'s' }}" {% if f.req %}required{% endif %}>
         {% endif %}</div>{% endfor %}

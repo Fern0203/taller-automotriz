@@ -47,7 +47,33 @@ LEFT JOIN (SELECT IdOrden, SUM(Cantidad * PrecioUnitario) AS TotalRepuestos
            FROM OrdenRepuesto GROUP BY IdOrden) r ON r.IdOrden = o.IdOrden;
 GO
 
-/* Vista 2: listado de órdenes con cliente, vehículo, estado y saldo */
+/* Vista 2: cliente con nombre completo, teléfono principal y dirección armada
+   (los datos se guardan atómicos; esta vista solo los presenta juntos) */
+CREATE OR ALTER VIEW vw_Cliente AS
+SELECT c.IdCliente, c.Nombres, c.Apellidos, c.Nombre, c.NIT, c.Correo,
+       c.Calle, c.Zona, c.IdMunicipio, m.Nombre AS Municipio,
+       d.IdDepartamento, d.Nombre AS Departamento,
+       CONCAT_WS(', ', c.Calle, 'Zona ' + CAST(c.Zona AS VARCHAR(2)), m.Nombre, d.Nombre) AS Direccion,
+       t.Numero AS Telefono, c.FechaRegistro
+FROM Cliente c
+LEFT JOIN Municipio m       ON m.IdMunicipio    = c.IdMunicipio
+LEFT JOIN Departamento d    ON d.IdDepartamento = m.IdDepartamento
+LEFT JOIN TelefonoCliente t ON t.IdCliente = c.IdCliente AND t.Principal = 1;
+GO
+
+/* Vista 3: vehículo con marca, modelo, color y propietario */
+CREATE OR ALTER VIEW vw_Vehiculo AS
+SELECT v.IdVehiculo, v.IdCliente, v.Placa, v.Anio, v.VIN, v.Kilometraje,
+       v.IdModelo, mo.Nombre AS Modelo, ma.IdMarca, ma.Nombre AS Marca,
+       v.IdColor, co.Nombre AS Color, c.Nombre AS Cliente
+FROM Vehiculo v
+INNER JOIN Modelo mo  ON mo.IdModelo = v.IdModelo
+INNER JOIN Marca ma   ON ma.IdMarca  = mo.IdMarca
+LEFT JOIN Color co    ON co.IdColor  = v.IdColor
+INNER JOIN Cliente c  ON c.IdCliente = v.IdCliente;
+GO
+
+/* Vista 4: listado de órdenes con cliente, vehículo, estado y saldo */
 CREATE OR ALTER VIEW vw_OrdenesDetalle AS
 SELECT o.IdOrden, o.FechaIngreso, o.FechaEntrega, o.FallaReportada,
        c.IdCliente, c.Nombre AS Cliente, c.Telefono,
@@ -56,13 +82,13 @@ SELECT o.IdOrden, o.FechaIngreso, o.FechaEntrega, o.FallaReportada,
        DATEDIFF(DAY, o.FechaIngreso, ISNULL(o.FechaEntrega, SYSDATETIME())) AS DiasEnTaller,
        co.Total, co.Pagado, co.Saldo
 FROM OrdenTrabajo o
-INNER JOIN Vehiculo v     ON v.IdVehiculo = o.IdVehiculo
-INNER JOIN Cliente c      ON c.IdCliente  = v.IdCliente
-INNER JOIN EstadoOrden e  ON e.IdEstado   = o.IdEstado
-INNER JOIN vw_CostoOrden co ON co.IdOrden = o.IdOrden;
+INNER JOIN vw_Vehiculo v    ON v.IdVehiculo = o.IdVehiculo
+INNER JOIN vw_Cliente c     ON c.IdCliente  = v.IdCliente
+INNER JOIN EstadoOrden e    ON e.IdEstado   = o.IdEstado
+INNER JOIN vw_CostoOrden co ON co.IdOrden   = o.IdOrden;
 GO
 
-/* Vista 3: historial de servicios por vehículo */
+/* Vista 5: historial de servicios por vehículo */
 CREATE OR ALTER VIEW vw_HistorialServiciosVehiculo AS
 SELECT v.Placa, v.Marca, v.Modelo, o.IdOrden, o.FechaIngreso, o.KmIngreso,
        s.Nombre AS Servicio, m.Nombre AS Mecanico,
@@ -70,13 +96,13 @@ SELECT v.Placa, v.Marca, v.Modelo, o.IdOrden, o.FechaIngreso, o.KmIngreso,
        e.Nombre AS EstadoOrden
 FROM OrdenServicio os
 INNER JOIN OrdenTrabajo o ON o.IdOrden    = os.IdOrden
-INNER JOIN Vehiculo v     ON v.IdVehiculo = o.IdVehiculo
+INNER JOIN vw_Vehiculo v  ON v.IdVehiculo = o.IdVehiculo
 INNER JOIN Servicio s     ON s.IdServicio = os.IdServicio
 INNER JOIN Mecanico m     ON m.IdMecanico = os.IdMecanico
 INNER JOIN EstadoOrden e  ON e.IdEstado   = o.IdEstado;
 GO
 
-/* Vista 4: carga de trabajo de mecánicos (órdenes sin entregar) */
+/* Vista 6: carga de trabajo de mecánicos (órdenes sin terminar) */
 CREATE OR ALTER VIEW vw_CargaMecanicos AS
 SELECT m.IdMecanico, m.Nombre,
        COUNT(DISTINCT CASE WHEN o.IdEstado IN (1,2,3) THEN o.IdOrden END) AS OrdenesActivas,

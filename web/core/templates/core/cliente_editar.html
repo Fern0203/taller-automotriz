@@ -1,12 +1,29 @@
 {% extends "core/base.html" %}
 {% block titulo %}{{ c.Nombre }}{% endblock %}
 {% block contenido %}
-<div class="top"><div><h1>{{ c.Nombre }}</h1><small>Cliente desde {{ c.FechaRegistro|date:"d/m/Y" }}</small></div>
+<div class="top"><div><h1>{{ c.Nombre }}</h1><small>Cliente desde {{ c.FechaRegistro|date:"d/m/Y" }}{% if c.Direccion %} · {{ c.Direccion }}{% endif %}</small></div>
   <a class="btn sec" href="{% url 'clientes' %}">← Volver</a></div>
 
 <div class="card"><h2>Datos del cliente</h2>
   <form method="post" class="f">{% csrf_token %}{% include "core/_cliente_campos.html" %}
     <div><button class="btn">Guardar cambios</button></div></form></div>
+
+<div class="card"><h2>Teléfonos</h2>
+  <table class="tabla"><tr><th>Número</th><th>Tipo</th><th></th><th></th></tr>
+  {% for t in telefonos %}<tr><td><b>{{ t.Numero }}</b></td><td>{{ t.Tipo }}</td>
+    <td>{% if t.Principal %}<span class="tag e4">Principal</span>{% endif %}</td>
+    <td class="r">
+      {% if not t.Principal %}<form method="post" action="{% url 'telefono_accion' c.IdCliente t.IdTelefono 'principal' %}" style="display:inline">{% csrf_token %}
+        <button class="btn sec sm">Hacer principal</button></form>{% endif %}
+      <form method="post" action="{% url 'telefono_accion' c.IdCliente t.IdTelefono 'eliminar' %}" style="display:inline" data-confirmar="¿Eliminar el teléfono {{ t.Numero }}?">{% csrf_token %}
+        <button class="btn rojo sm">Eliminar</button></form></td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Sin teléfonos.</td></tr>{% endfor %}
+  </table>
+  <form method="post" action="{% url 'telefono_agregar' c.IdCliente 'agregar' %}" class="inline" style="margin-top:12px">{% csrf_token %}
+    <div><label>Nuevo teléfono</label><input name="telefono" maxlength="20" required inputmode="numeric" pattern="[0-9 \-]{8,20}" title="8 a 15 dígitos"></div>
+    <div style="max-width:160px"><label>Tipo</label><select name="tipo_tel">{% for t in tipos_tel %}<option>{{ t }}</option>{% endfor %}</select></div>
+    <button class="btn" style="flex:0">Agregar</button></form>
+</div>
 
 <div class="card"><h2>Vehículos</h2><div class="scroll">
   <table class="tabla"><tr><th>Placa</th><th>Vehículo</th><th>Año</th><th class="r">Km</th><th></th></tr>

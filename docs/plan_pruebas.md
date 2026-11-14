@@ -31,3 +31,14 @@ BEGIN TRY EXEC sp_AgregarRepuestoOrden 3, 5, 999; END TRY
 BEGIN CATCH PRINT ERROR_MESSAGE(); END CATCH
 SELECT @antes AS StockAntes, Stock AS StockDespues FROM Repuesto WHERE IdRepuesto = 5;  -- deben ser iguales
 ```
+
+## Pruebas de atomicidad (teléfonos, dirección y catálogos)
+| # | Módulo | Acción | Resultado esperado | ¿OK? |
+|---|---|---|---|---|
+| 20 | Clientes | Registrar teléfono como `5511-2233` | Se guarda `55112233` (solo dígitos) | |
+| 21 | Clientes | Agregar un segundo teléfono y marcarlo como principal | Solo uno queda como principal | |
+| 22 | Clientes | Eliminar el único teléfono | "El cliente debe conservar al menos un teléfono" | |
+| 23 | Clientes | Eliminar el teléfono principal teniendo otro | El otro pasa a ser principal | |
+| 24 | Catálogos | Crear un modelo nuevo y usarlo en un vehículo | Aparece agrupado bajo su marca | |
+| 25 | Catálogos | Crear una marca repetida | "Ya existe un registro con ese nombre" | |
+| 26 | Clientes | Ordenar/buscar por apellido | Lista ordenada por apellidos | |

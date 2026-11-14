@@ -5,7 +5,7 @@
   <a class="btn sec" href="{% url 'clientes' %}">← Volver</a></div>
 <form method="post" class="f">{% csrf_token %}
   <div class="card"><h2>Datos del cliente</h2>
-    {% with c=None %}{% include "core/_cliente_campos.html" %}{% endwith %}</div>
+    {% include "core/_cliente_campos.html" with c=None con_telefono=True %}</div>
   <div class="card"><h2>Vehículo</h2>{% include "core/_vehiculo_campos.html" %}</div>
   <div><button class="btn">Guardar cliente y vehículo</button></div>
 </form>

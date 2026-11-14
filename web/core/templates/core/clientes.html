@@ -8,14 +8,14 @@
     <div><input name="q" value="{{ q }}" placeholder="Buscar por nombre, NIT o teléfono"></div>
     <button class="btn sec" style="flex:0">Buscar</button></form>
   <div class="scroll"><table class="tabla">
-    <tr><th>Nombre</th><th>NIT</th><th>Teléfono</th><th>Correo</th><th class="r">Vehículos</th><th></th></tr>
+    <tr><th>Nombre</th><th>NIT</th><th>Teléfono</th><th>Municipio</th><th>Correo</th><th class="r">Vehículos</th><th></th></tr>
     {% for c in clientes %}
-    <tr><td>{{ c.Nombre }}</td><td>{{ c.NIT }}</td><td>{{ c.Telefono }}</td><td>{{ c.Correo|default:"—" }}</td>
+    <tr><td>{{ c.Nombre }}</td><td>{{ c.NIT }}</td><td>{{ c.Telefono }}</td><td>{{ c.Municipio|default:"—" }}</td><td>{{ c.Correo|default:"—" }}</td>
       <td class="r">{{ c.Vehiculos }}</td>
       <td class="r"><a class="btn sec sm" href="{% url 'cliente_editar' c.IdCliente %}">Ver / editar</a>
         <form method="post" action="{% url 'cliente_eliminar' c.IdCliente %}" style="display:inline" data-confirmar="¿Eliminar a {{ c.Nombre }}?">
           {% csrf_token %}<button class="btn rojo sm">Eliminar</button></form></td></tr>
-    {% empty %}<tr><td colspan="6" class="muted">Sin resultados.</td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="7" class="muted">Sin resultados.</td></tr>{% endfor %}
   </table></div>
 </div>
 {% endblock %}

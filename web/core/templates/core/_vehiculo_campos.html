@@ -1,8 +1,16 @@
 <div class="fila">
   <div><label>Placa *</label><input name="placa" maxlength="10" required value="{{ v.Placa|default:'' }}" pattern="[A-Za-z0-9]+" title="Solo letras y números, sin guiones" style="text-transform:uppercase"></div>
-  <div><label>Marca *</label><input name="marca" maxlength="50" required value="{{ v.Marca|default:'' }}"></div>
-  <div><label>Modelo *</label><input name="modelo" maxlength="50" required value="{{ v.Modelo|default:'' }}"></div>
+  <div><label>Marca y modelo *</label>
+    <select name="modelo" required><option value="">-- Seleccione --</option>
+      {% for marca, lista in modelos %}<optgroup label="{{ marca }}">
+        {% for m in lista %}<option value="{{ m.IdModelo }}" {% if v.IdModelo == m.IdModelo %}selected{% endif %}>{{ marca }} {{ m.Nombre }}</option>{% endfor %}
+      </optgroup>{% endfor %}
+    </select>
+    <small>¿No aparece? <a href="{% url 'catalogo' 'modelos' %}" target="_blank">Agregar modelo</a></small></div>
   <div><label>Año *</label><input type="number" name="anio" min="1950" max="2100" required value="{{ v.Anio|default:'' }}"></div>
-  <div><label>Color</label><input name="color" maxlength="30" value="{{ v.Color|default:'' }}"></div>
+  <div><label>Color</label>
+    <select name="color"><option value="">-- Sin especificar --</option>
+      {% for co in colores %}<option value="{{ co.IdColor }}" {% if v.IdColor == co.IdColor %}selected{% endif %}>{{ co.Nombre }}</option>{% endfor %}
+    </select></div>
   <div><label>Kilometraje *</label><input type="number" name="kilometraje" min="0" required value="{{ v.Kilometraje|default:'0' }}"></div>
 </div>

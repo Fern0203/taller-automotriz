@@ -1,7 +1,22 @@
 <div class="fila">
-  <div><label>Nombre *</label><input name="nombre" maxlength="100" required value="{{ c.Nombre|default:'' }}"></div>
+  <div><label>Nombres *</label><input name="nombres" maxlength="60" required value="{{ c.Nombres|default:'' }}" placeholder="Ej. Ana Lucía (o razón social)"></div>
+  <div><label>Apellidos</label><input name="apellidos" maxlength="60" value="{{ c.Apellidos|default:'' }}" placeholder="Vacío si es empresa"></div>
   <div><label>NIT</label><input name="nit" maxlength="15" placeholder="CF" value="{{ c.NIT|default:'' }}"></div>
-  <div><label>Teléfono *</label><input name="telefono" maxlength="15" required pattern="[0-9 \-+]{8,15}" title="8 a 15 dígitos" value="{{ c.Telefono|default:'' }}"></div>
   <div><label>Correo</label><input type="email" name="correo" maxlength="100" value="{{ c.Correo|default:'' }}"></div>
 </div>
-<div><label>Dirección</label><input name="direccion" maxlength="200" value="{{ c.Direccion|default:'' }}"></div>
+{% if con_telefono %}
+<div class="fila">
+  <div><label>Teléfono *</label><input name="telefono" maxlength="20" required inputmode="numeric" pattern="[0-9 \-]{8,20}" title="8 a 15 dígitos" placeholder="55112233"></div>
+  <div><label>Tipo</label><select name="tipo_tel">{% for t in tipos_tel %}<option>{{ t }}</option>{% endfor %}</select></div>
+</div>
+{% endif %}
+<div class="fila">
+  <div><label>Calle / avenida y número</label><input name="calle" maxlength="100" value="{{ c.Calle|default:'' }}" placeholder="5a. Av. 10-25"></div>
+  <div style="max-width:120px"><label>Zona</label><input type="number" name="zona" min="1" max="25" value="{{ c.Zona|default:'' }}"></div>
+  <div><label>Municipio</label>
+    <select name="municipio"><option value="">-- Sin especificar --</option>
+      {% for depto, lista in municipios %}<optgroup label="{{ depto }}">
+        {% for m in lista %}<option value="{{ m.IdMunicipio }}" {% if c.IdMunicipio == m.IdMunicipio %}selected{% endif %}>{{ m.Nombre }}</option>{% endfor %}
+      </optgroup>{% endfor %}
+    </select></div>
+</div>
