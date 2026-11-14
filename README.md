@@ -1,10 +1,6 @@
 # Sistema de Órdenes de Trabajo — Taller Automotriz
 
 <p align="center">
-  <img src="web/core/static/core/logo_universidad.png" alt="Logo de la universidad" width="140">
-</p>
-
-<p align="center">
   <b>Universidad Mariano Gálvez de Guatemala</b><br>
   Ingeniería en Sistemas de Información · Curso: Bases de Datos · Sexto semestre 2026
 </p>
@@ -14,7 +10,7 @@ Proyecto final de Bases de Datos (Ejercicio 4). Python + Django + **SQL Server**
 ## Integrantes
 
 | No. | Nombre | Carné |
-|---|---|---|---|
+|---|---|---|
 | 1 | Fernando José Batz Marroquín | 0903-23-463 |
 | 2 | Emerson Desaylí Orozco Salvador | 0903-24-16049 |
 | 3 | Harold Jose Gonzalez Ochoa | 0903-24-21104 |
@@ -31,7 +27,8 @@ taller/
 │   ├── 02_datos.sql              catálogos y datos de prueba
 │   ├── 03_funciones_vistas.sql   fn_TotalOrden, fn_PagadoOrden y 6 vistas
 │   ├── 04_procedimientos.sql     12 procedimientos (+ órdenes de ejemplo)
-│   └── 05_reportes.sql           consultas de los reportes para probar en SSMS
+│   ├── 05_reportes.sql           consultas de los reportes para probar en SSMS
+│   └── 06_datos_masivos.sql      (opcional) ~25 clientes, ~40 vehículos y ~60 órdenes de prueba
 ├── web/                          proyecto Django
 │   ├── .env.example              plantilla de la conexión (copiar como .env)
 │   ├── taller_web/settings.py    configuración (lee los datos de .env)
@@ -74,6 +71,8 @@ SELECT type_desc, COUNT(*) AS Cantidad FROM sys.objects
 WHERE type IN ('V','P','FN') GROUP BY type_desc;
 ```
 Debe mostrar **VIEW 6**, **SQL_STORED_PROCEDURE 12** y **SQL_SCALAR_FUNCTION 2**.
+
+> 💡 **Opcional:** después del 04, ejecuten `sql/06_datos_masivos.sql` para llenar la app con muchos datos de prueba. Solo una vez.
 
 > ⚠️ `01_tablas.sql` **borra y vuelve a crear** TallerDB. Para empezar de cero, ejecuten de nuevo los 4 scripts en orden.
 > No ejecuten `02_datos.sql` solo una segunda vez: da errores de datos duplicados.
