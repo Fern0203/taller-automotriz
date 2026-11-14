@@ -10,7 +10,7 @@
 <div class="app">
   <nav class="side">
     {% with u=request.resolver_match.url_name %}
-    <div class="logo">🔧 Taller Automotriz</div>
+    <div class="logo"><img src="{% static 'core/logo_universidad.png' %}" alt="" onerror="this.remove()">🔧 Taller Automotriz</div>
     <a href="{% url 'inicio' %}" class="{% if u == 'inicio' %}on{% endif %}">Panel</a>
     <div class="sec">Operación</div>
     <a href="{% url 'ordenes' %}" class="{% if 'orden' in u %}on{% endif %}">Órdenes de trabajo</a>
@@ -26,6 +26,7 @@
     <div class="sec">Análisis</div>
     <a href="{% url 'reportes' %}" class="{% if u == 'reportes' %}on{% endif %}">Reportes</a>
     <a href="{% url 'consulta' %}" target="_blank">Consulta para clientes ↗</a>
+    <a href="{% url 'equipo' %}" class="{% if u == 'equipo' %}on{% endif %}">Equipo del proyecto</a>
     <div class="sec">{{ user.username }}</div>
     <form method="post" action="{% url 'logout' %}">{% csrf_token %}
       <button class="btn sec sm" style="margin-left:10px">Cerrar sesión</button></form>

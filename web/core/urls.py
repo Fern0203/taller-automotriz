@@ -26,4 +26,5 @@ urlpatterns = [
     path("catalogos/<str:nombre>/<int:idx>/", views.catalogo, name="catalogo_editar"),
 
     path("reportes/", views.reportes, name="reportes"),
+    path("equipo/", views.equipo, name="equipo"),
 ]

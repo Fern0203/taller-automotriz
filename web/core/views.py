@@ -507,3 +507,9 @@ def consulta_publica(request):
     return render(request, "core/consulta.html",
                   {"o": orden, "historial": historial, "placa": placa, "num": num,
                    "pasos": ["Recibido", "Diagnóstico", "Reparación", "Terminado", "Entregado"]})
+
+
+# ------------------------------------------------------------------ equipo
+def equipo(request):
+    """Datos del grupo (se editan en core/equipo.py). Pública, igual que la consulta."""
+    return render(request, "core/equipo.html")

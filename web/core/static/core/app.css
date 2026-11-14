@@ -84,3 +84,14 @@ input[type=checkbox]{width:auto}
   .side,.no-print{display:none!important}
   body{background:#fff} .card{border:0;padding:0}
 }
+
+/* logo y equipo */
+.side .logo img{display:block;width:48px;height:48px;object-fit:contain;margin-bottom:8px;background:#fff;border-radius:8px;padding:3px}
+.marca{display:flex;gap:12px;align-items:center;padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.marca img{width:56px;height:56px;object-fit:contain}
+.equipo-head{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.equipo-head img{width:110px;height:110px;object-fit:contain}
+.equipo-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.persona{border:1px solid var(--line);border-radius:var(--radius);padding:14px;background:#fff}
+.persona .ini{width:42px;height:42px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;margin-bottom:8px}
+.persona .carne{font-family:Consolas,monospace;color:var(--brand);font-size:13px}

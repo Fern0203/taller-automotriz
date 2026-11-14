@@ -1,0 +1,25 @@
+{% extends "core/base.html" %}{% load static %}
+{% block titulo %}Equipo{% endblock %}
+{% block contenido %}
+<div class="card equipo-head">
+  <img src="{% static 'core/logo_universidad.png' %}" alt="Logo de la universidad" onerror="this.remove()">
+  <div>
+    <h1>{{ equipo.universidad }}</h1>
+    <p style="margin:4px 0">{{ equipo.carrera }}</p>
+    <p class="muted" style="margin:0">Curso: <b>{{ equipo.curso }}</b> · {{ equipo.ciclo }}</p>
+    <p class="muted" style="margin:4px 0 0">Proyecto final: {{ equipo.proyecto }}</p>
+  </div>
+</div>
+<div class="card"><h2>Integrantes</h2>
+  <div class="equipo-grid">
+    {% for p in equipo.integrantes %}
+    <div class="persona">
+      <div class="ini">{{ p.nombre|slice:":1" }}</div>
+      <b>{{ p.nombre }}</b><br>
+      <span class="carne">Carné: {{ p.carne }}</span>
+      {% if p.rol %}<p class="muted" style="margin:6px 0 0">{{ p.rol }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

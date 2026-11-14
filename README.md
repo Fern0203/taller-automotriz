@@ -1,6 +1,28 @@
 # Sistema de Órdenes de Trabajo — Taller Automotriz
 
+<p align="center">
+  <img src="web/core/static/core/logo_universidad.png" alt="Logo de la universidad" width="140">
+</p>
+
+<p align="center">
+  <b>Universidad Mariano Gálvez de Guatemala</b><br>
+  Ingeniería en Sistemas de Información · Curso: Bases de Datos · Sexto semestre 2026
+</p>
+
 Proyecto final de Bases de Datos (Ejercicio 4). Python + Django + **SQL Server**.
+
+## Integrantes
+
+| No. | Nombre | Carné |
+|---|---|---|---|
+| 1 | Fernando José Batz Marroquín | 0903-23-463 |
+| 2 | Emerson Desaylí Orozco Salvador | 0903-24-16049 |
+| 3 | Harold Jose Gonzalez Ochoa | 0903-24-21104 |
+| 4 | José Daniel Fuentes García | 0903-23-7050 |
+| 5 | Darwin Danilo Castro Garcia | 0903-20-6780 |
+
+> Los mismos datos se muestran en la aplicación (menú **Equipo del proyecto** y pantalla de login).
+> Para cambiarlos en la app se edita `web/core/equipo.py`.
 
 ```
 taller/
@@ -14,6 +36,7 @@ taller/
 │   ├── .env.example              plantilla de la conexión (copiar como .env)
 │   ├── taller_web/settings.py    configuración (lee los datos de .env)
 │   └── core/
+│       ├── equipo.py             datos del grupo (nombres, carnés, curso)
 │       ├── db.py                 acceso a datos (SQL directo, vistas y SP)
 │       ├── views.py              lógica de cada pantalla
 │       ├── urls.py               rutas
